@@ -6,4 +6,4 @@ The dataset used to generate the findings in the report is provided through the 
 
 We finally observed that the **admission ratio at the University of Colorado Boulder is influenced by various factors such as the applicant’s residency status and submission of standardized test scores**- which was used to estimate the trends of the entire United States admission process. 
 
-<iframe width="560" height="315" src="https://www.youtube.com/embed/WQo1--4bqmY?si=DHb4YuEMqF45LMYD" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+[Presentation Link](https://youtu.be/WQo1--4bqmY?si=bKDAB4UWuEPEtZq0)
