@@ -1,0 +1,188 @@
+---
+title: "STAT_EDA"
+author: "Niranjan"
+date: "2023-12-15"
+output: pdf_document
+---
+
+```{r Packages Shortcuts}
+library(tidyverse) # Visualization using ggplots
+library(dplyr) # Data Wrangling and Manipulation
+```
+
+```{r Import Data}
+data <- read.csv("CU_Boulder_Applicant_Data.csv")
+head(data,5)
+```
+
+```{r Trend of applicants over time}
+# Number of applicants received since 2011.
+app_recvd <- data %>%
+  filter(Level=="Masters") %>%
+    select(Year_Discrete, Applied) %>%
+      group_by(Year_Discrete) %>%
+        summarise(Applications_Received= sum(Applied))
+
+app_recvd$Year_Discrete <- as.factor(app_recvd$Year_Discrete)
+
+ggplot(data = app_recvd) +
+  geom_line(mapping = aes(x= Year_Discrete, y= Applications_Received, group= 1)) +
+    geom_point(mapping = aes(x= Year_Discrete, y= Applications_Received)) +
+       geom_text(mapping = aes(x = Year_Discrete, y = Applications_Received, label = Applications_Received),vjust = -1, hjust = 0.5, size = 3) +
+          labs(x= "Year", y= "Number of applications received", title= "Trend of applicants over time") +
+            scale_x_discrete(breaks = unique(app_recvd$Year_Discrete)) + #To display all years in x axis labels
+              theme(plot.title = element_text(hjust = 0.5), axis.title.x = element_text(size = 8), axis.title.y = element_text(size = 8))
+
+# Admitted and enrolled ratio since 2011.
+admit_enroll_ratio <- data %>%
+  filter(Level=="Masters") %>%
+    select(Year_Discrete, Applied, Admitted, Enrolled) %>%
+      group_by(Year_Discrete) %>%
+        summarise(Applied= sum(Applied), Admitted=sum(Admitted), Enrolled= sum(Enrolled)) %>%
+          mutate(Admitted_ratio=round(100*(Admitted/Applied),1), Enrolled_ratio= round(100*(Enrolled/Admitted),1)) %>%
+            select(Year_Discrete, Admitted_ratio, Enrolled_ratio)
+
+admit_enroll_ratio$Year_Discrete <- as.factor(admit_enroll_ratio$Year_Discrete)
+
+ggplot(data = admit_enroll_ratio) +
+  geom_line(mapping = aes(x= Year_Discrete, y= Admitted_ratio, group =1, color= 'Admitted Ratio')) +
+  geom_line(mapping = aes(x= Year_Discrete, y= Enrolled_ratio, group =1, color= 'Enrolled Ratio' )) +
+    geom_point(mapping = aes(x= Year_Discrete, y= Admitted_ratio)) +
+    geom_point(mapping = aes(x= Year_Discrete, y= Enrolled_ratio)) +
+      geom_text(mapping = aes(x = Year_Discrete, y = Admitted_ratio, label = Admitted_ratio),vjust = -1, hjust = 0.5, size = 3) +
+      geom_text(mapping = aes(x = Year_Discrete, y = Enrolled_ratio, label = Enrolled_ratio),vjust = -1, hjust = 0.5, size = 3) +
+        labs(x= "Year", y= "Ratio", title= "Admitted and enrolled ratio since 2011") +
+        scale_color_manual(values = c('Admitted Ratio'= 'blue', 'Enrolled Ratio'= 'orange'), name = 'Legend:') +
+        scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+          theme(plot.title = element_text(hjust = 0.5), axis.title.x = element_text(size = 8), axis.title.y = element_text(size = 8), legend.position = "bottom") +
+            expand_limits(y = c(30, 65))
+
+
+```
+
+```{r Course popularity at CU}
+# Top 5 majors that received application (CSEN, DTSC, BUAN, ASEN, SLHS, EEEN) trend over time for last 10 years.
+
+# Top majors that received applications in the year 2023
+top_major <- data %>%
+  filter(Level == "Masters" & Year_Discrete == 2023) %>%
+    select(Year_Discrete, Major, Applied) %>%
+      group_by(Year_Discrete, Major) %>%
+        summarise(Applications_Received = sum(Applied)) %>%
+          arrange(desc(Applications_Received)) %>%
+            mutate(Major_Bucketed = ifelse(row_number() <= 10, as.character(Major), "Other (63 majors)")) %>%
+              select(Year_Discrete, Major_Bucketed,Applications_Received) %>%
+                group_by(Year_Discrete, Major_Bucketed) %>%
+                  summarise(Applications_Received = sum(Applications_Received))
+
+total_applications <- sum(top_major$Applications_Received)
+
+top_major <- top_major %>%
+  mutate(Applications_Received_Share=round(100*(Applications_Received/total_applications),2)) %>%
+    select(Year_Discrete, Major_Bucketed,Applications_Received_Share) %>%
+      arrange(desc(Applications_Received_Share))
+
+ggplot(data = top_major) +
+  geom_col(mapping=aes(x = reorder(Major_Bucketed, Applications_Received_Share),y = Applications_Received_Share))+
+      geom_text(aes(x = Major_Bucketed, y = Applications_Received_Share, label = sprintf("%.1f%%", Applications_Received_Share)),hjust = +1.1, vjust = 0.5, size = 3, color = "white") +
+          labs(x = "Major", y = "Applications Received Share (%)",title = "Share of applications by major in 2023") +
+            coord_flip() +
+              theme(plot.title = element_text(hjust = 0.1), axis.title.x = element_text(size = 8), axis.title.y = element_text(size = 8), legend.position = "bottom") 
+
+```
+
+```{r Influence of standardized scores on admission status}
+# Ratio of applications split by test scores
+test_scores_data= data %>%
+  mutate(test_score_submission_flag= ifelse((Count.GMAT==1 | Count.gre2011==1) , 1, 0)) %>%
+    filter(Level == "Masters") %>%
+      select(Year_Discrete, test_score_submission_flag, Applied) %>%
+        group_by(Year_Discrete, test_score_submission_flag) %>%
+          summarise(Applications_Received = sum(Applied)) %>%
+            mutate(test_score_submission_flag = ifelse(test_score_submission_flag==1, "With Test Score", "Without Test Score")) %>%
+                mutate(Percentage = round(Applications_Received / sum(Applications_Received),2))
+
+
+test_scores_data$Year_Discrete <- as.factor(test_scores_data$Year_Discrete)
+
+
+ggplot(test_scores_data, aes(x = Year_Discrete, y =Applications_Received , fill =factor(test_score_submission_flag))) +
+  geom_bar(stat = "identity", position = "fill") +
+    scale_y_continuous(labels = scales::percent_format(scale = 100)) +
+      labs(title = "Test score submission ratio",x= "Year", y = "Percentage of Applications",fill = "Applications") +
+       geom_text(aes(label = scales::percent(Percentage)),   position = position_fill(vjust = 0.5), size = 3,  color = "black")  +
+          theme(plot.title = element_text(hjust = 0.5), axis.title.x = element_text(size = 8), axis.title.y = element_text(size = 8), legend.position = "bottom") + 
+            scale_x_discrete(breaks = unique(test_scores_data$Year_Discrete))
+
+
+
+```
+
+```{r Influence of standardized scores on admission status}
+# Ratio of applications split by test scores
+test_scores_data= data %>%
+  mutate(test_score_submission_flag= ifelse((Count.GMAT==1 | Count.gre2011==1) , 1, 0)) %>%
+    filter(Level == "Masters") %>%
+      select(Year_Discrete, test_score_submission_flag, Applied) %>%
+        group_by(Year_Discrete, test_score_submission_flag) %>%
+          summarise(Applications_Received = sum(Applied)) %>%
+            mutate(test_score_submission_flag = ifelse(test_score_submission_flag==1, "With Test Score", "Without Test Score")) %>%
+                mutate(Percentage = round(Applications_Received / sum(Applications_Received),2))
+
+
+test_scores_data$Year_Discrete <- as.factor(test_scores_data$Year_Discrete)
+
+
+ggplot(test_scores_data, aes(x = Year_Discrete, y =Applications_Received , fill =factor(test_score_submission_flag))) +
+  geom_bar(stat = "identity", position = "fill") +
+    scale_y_continuous(labels = scales::percent_format(scale = 100)) +
+      labs(title = "Test score submission ratio",x= "Year", y = "Percentage of Applications",fill = "Applications") +
+       geom_text(aes(label = scales::percent(Percentage)),   position = position_fill(vjust = 0.5), size = 3,  color = "black")  +
+          theme(plot.title = element_text(hjust = 0.5), axis.title.x = element_text(size = 8), axis.title.y = element_text(size = 8), legend.position = "bottom") + 
+            scale_x_discrete(breaks = unique(test_scores_data$Year_Discrete))
+
+# Ratio of test score submitted applications got admitted
+admitted_ratio_ts= data %>%
+  mutate(test_score_submission_flag= ifelse((Count.GMAT==1 | Count.gre2011==1) , 1, 0)) %>%
+    filter(Level == "Masters", test_score_submission_flag==1) %>%
+      select(Year_Discrete, Applied, Admitted) %>%
+        group_by(Year_Discrete) %>%
+          summarise(Applied = sum(Applied), Admitted= sum(Admitted)) %>%
+                mutate(Admitted_Ratio = round(100*(Admitted / Applied))) %>%
+                  select(Year_Discrete, Admitted_Ratio)
+            
+
+
+admitted_ratio_ts$Year_Discrete <- as.factor(admitted_ratio_ts$Year_Discrete)
+
+ggplot(data = admitted_ratio_ts) +
+  geom_line(mapping = aes(x= Year_Discrete, y= Admitted_Ratio, group= 1)) +
+    geom_point(mapping = aes(x= Year_Discrete, y= Admitted_Ratio)) +
+       geom_text(mapping = aes(x = Year_Discrete, y = Admitted_Ratio, label = Admitted_Ratio),vjust = -1, hjust = 0.5, size = 3) +
+          labs(x= "Year", y= "Admittance Rate", title= "Trend in admittance rate for test score submissions") +
+            scale_x_discrete(breaks = unique(app_recvd$Year_Discrete)) + #To display all years in x axis labels
+              theme(plot.title = element_text(hjust = 0.5), axis.title.x = element_text(size = 8), axis.title.y = element_text(size = 8)) + 
+                scale_y_continuous(labels = scales::percent_format(scale = 1), limits = c(30,70)) 
+
+# Ratio of test score submitted applications got admitted
+admitted_ratio_ts= data %>%
+  mutate(test_score_submission_flag= ifelse((Count.GMAT==1 | Count.gre2011==1) , 1, 0)) %>%
+    filter(Level == "Masters", test_score_submission_flag==1) %>%
+      mutate(Period= ifelse(Year_Discrete <= 2020, 'Pre-Covid', "Post-Covid")) %>%
+      select(Period, Applied, Admitted) %>%
+        group_by(Period) %>%
+          summarise(Applied = sum(Applied), Admitted= sum(Admitted)) %>%
+                mutate(Admitted_Ratio = round(100*(Admitted / Applied))) %>%
+                  select(Period, Admitted_Ratio)
+          
+
+# Create a pie chart with ggplot2
+ggplot(admitted_ratio_ts, aes(x = "", y = Admitted_Ratio, fill = rainbow(length(admitted_ratio_ts$Period)))) +
+  geom_bar(stat = "identity", width = 1, color = "white") +
+    coord_polar("y") +
+      labs(title = "Admittence rate for test score submissions", fill = "Period") +
+        theme_minimal() +
+          theme(legend.position = "none", axis.text = element_blank(), axis.title = element_blank(), plot.title = element_text(hjust = 0.6))+
+            geom_text(aes(label = paste(Period, "\n", Admitted_Ratio, "%")), position = position_stack(vjust = 0.5))
+
+```
